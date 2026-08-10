@@ -2,7 +2,7 @@ import Phaser from "phaser";
 import "./style.css";
 
 const GAME = { width: 1280, height: 720 } as const;
-const GLASS = { x: 150, y: 108, width: 980, height: 510 } as const;
+const GLASS = { x: 0, y: 48, width: 1280, height: 620 } as const;
 const BRUSH_RADIUS = 44;
 const DROP_VARIANTS = 6;
 const MAX_DROPS = 5;
@@ -268,6 +268,98 @@ void main () {
 }`;
 
 type Point = { x: number; y: number };
+const SURFACE_SHAPES: Record<ThemeKey, { points: Point[]; divider: [number, number] }> = {
+  frost: {
+    points: [
+      { x: 207, y: 60 },
+      { x: 1120, y: 60 },
+      { x: 1125, y: 92 },
+      { x: 1134, y: 140 },
+      { x: 1146, y: 202 },
+      { x: 1159, y: 278 },
+      { x: 1167, y: 362 },
+      { x: 1168, y: 460 },
+      { x: 1160, y: 545 },
+      { x: 1149, y: 624 },
+      { x: 1155, y: 665 },
+      { x: 1008, y: 665 },
+      { x: 1002, y: 650 },
+      { x: 990, y: 640 },
+      { x: 965, y: 633 },
+      { x: 875, y: 630 },
+      { x: 852, y: 635 },
+      { x: 843, y: 650 },
+      { x: 841, y: 665 },
+      { x: 520, y: 665 },
+      { x: 510, y: 653 },
+      { x: 488, y: 642 },
+      { x: 450, y: 636 },
+      { x: 350, y: 632 },
+      { x: 260, y: 638 },
+      { x: 225, y: 649 },
+      { x: 213, y: 665 },
+      { x: 170, y: 665 },
+      { x: 168, y: 557 },
+      { x: 165, y: 482 },
+      { x: 150, y: 390 },
+      { x: 174, y: 303 },
+      { x: 185, y: 229 },
+      { x: 196, y: 168 },
+      { x: 204, y: 119 },
+      { x: 204, y: 108 },
+    ],
+    divider: [60, 665],
+  },
+  mist: {
+    points: [
+      { x: 10, y: 174 },
+      { x: 18, y: 145 },
+      { x: 54, y: 120 },
+      { x: 111, y: 104 },
+      { x: 198, y: 92 },
+      { x: 351, y: 84 },
+      { x: 640, y: 79 },
+      { x: 929, y: 84 },
+      { x: 1082, y: 95 },
+      { x: 1174, y: 111 },
+      { x: 1232, y: 134 },
+      { x: 1267, y: 169 },
+      { x: 1273, y: 320 },
+      { x: 1265, y: 441 },
+      { x: 1238, y: 529 },
+      { x: 1190, y: 580 },
+      { x: 1148, y: 612 },
+      { x: 1010, y: 626 },
+      { x: 822, y: 635 },
+      { x: 640, y: 638 },
+      { x: 453, y: 635 },
+      { x: 268, y: 625 },
+      { x: 122, y: 604 },
+      { x: 76, y: 576 },
+      { x: 42, y: 523 },
+      { x: 20, y: 452 },
+      { x: 10, y: 360 },
+    ],
+    divider: [79, 638],
+  },
+  shower: {
+    points: [
+      { x: 206, y: 130 },
+      { x: 1082, y: 130 },
+      { x: 1087, y: 132 },
+      { x: 1089, y: 137 },
+      { x: 1089, y: 608 },
+      { x: 1087, y: 613 },
+      { x: 1082, y: 616 },
+      { x: 206, y: 616 },
+      { x: 202, y: 613 },
+      { x: 200, y: 608 },
+      { x: 200, y: 137 },
+      { x: 202, y: 132 },
+    ],
+    divider: [130, 616],
+  },
+};
 type WetStroke = Point & { x2: number; y2: number; born: number; angle: number; energy: number };
 type Drop = Point & {
   radius: number;
@@ -344,6 +436,14 @@ if (import.meta.env.DEV) {
     isGestureTurn({ x: 1, y: 0 }, { x: 0, y: 1 }, 24) && !isGestureTurn({ x: 1, y: 0 }, { x: 0.9, y: 0.44 }, 24),
     "꺾인 획 구분이 틀어졌습니다.",
   );
+  console.assert(
+    Object.values(SURFACE_SHAPES).every((shape) =>
+      shape.points.every(
+        ({ x, y }) => x >= GLASS.x && x <= GLASS.x + GLASS.width && y >= GLASS.y && y <= GLASS.y + GLASS.height,
+      ),
+    ),
+    "유리 윤곽이 렌더 영역 밖으로 나갔습니다.",
+  );
   console.assert(dropCheck.length === 12 && dropCheck.every((point) => point.x > 24 && point.x < 168), "물방울 실루엣이 틀어졌습니다.");
 }
 
@@ -393,24 +493,30 @@ function drawCover(context: CanvasRenderingContext2D, source: HTMLImageElement) 
   context.drawImage(source, sx, sy, sw, sh, 0, 0, GLASS.width, GLASS.height);
 }
 
-function drawGameGlassCrop(
-  context: CanvasRenderingContext2D,
-  source: HTMLImageElement,
-  sourceRect: { x: number; y: number; width: number; height: number } = GLASS,
-) {
+function drawGameGlassCrop(context: CanvasRenderingContext2D, source: HTMLImageElement) {
   const scaleX = source.naturalWidth / GAME.width;
   const scaleY = source.naturalHeight / GAME.height;
   context.drawImage(
     source,
-    sourceRect.x * scaleX,
-    sourceRect.y * scaleY,
-    sourceRect.width * scaleX,
-    sourceRect.height * scaleY,
+    GLASS.x * scaleX,
+    GLASS.y * scaleY,
+    GLASS.width * scaleX,
+    GLASS.height * scaleY,
     0,
     0,
     GLASS.width,
     GLASS.height,
   );
+}
+
+function drawStageForeground(context: CanvasRenderingContext2D, source: HTMLImageElement, points: Point[]) {
+  context.drawImage(source, 0, 0, GAME.width, GAME.height);
+  context.globalCompositeOperation = "destination-out";
+  context.beginPath();
+  context.moveTo(points[0].x, points[0].y);
+  points.slice(1).forEach((point) => context.lineTo(point.x, point.y));
+  context.closePath();
+  context.fill();
 }
 
 function paintBrush(context: CanvasRenderingContext2D) {
@@ -694,9 +800,13 @@ class FrostScene extends Phaser.Scene {
   private frost!: Phaser.Textures.DynamicTexture;
   private waterMap!: Phaser.Textures.DynamicTexture;
   private stageBackdrop!: Phaser.GameObjects.Image;
+  private stageForeground!: Phaser.GameObjects.Image;
   private ambientLayer!: Phaser.GameObjects.Graphics;
-  private frame!: Phaser.GameObjects.Graphics;
-  private glassEdge!: Phaser.GameObjects.Graphics;
+  private surfaceLayer!: Phaser.GameObjects.Layer;
+  private dropLayer!: Phaser.GameObjects.Container;
+  private surfaceMaskShape!: Phaser.GameObjects.Graphics;
+  private surfaceMaskFilter!: Phaser.Filters.Mask;
+  private surfacePolygon = new Phaser.Geom.Polygon(SURFACE_SHAPES.frost.points);
   private divider!: Phaser.GameObjects.Graphics;
   private glassShader!: Phaser.GameObjects.Shader;
   private blurred!: Phaser.GameObjects.Image;
@@ -806,17 +916,27 @@ class FrostScene extends Phaser.Scene {
       );
     }
 
+    addCanvasTexture(this, "frost-foreground", GAME.width, GAME.height, (context) =>
+      drawStageForeground(context, winter, SURFACE_SHAPES.frost.points),
+    );
+    addCanvasTexture(this, "mist-foreground", GAME.width, GAME.height, (context) =>
+      drawStageForeground(context, warmRain, SURFACE_SHAPES.mist.points),
+    );
+    addCanvasTexture(this, "shower-foreground", GAME.width, GAME.height, (context) =>
+      drawStageForeground(context, shower, SURFACE_SHAPES.shower.points),
+    );
+
     addCanvasTexture(this, "winter-view", GLASS.width, GLASS.height, (context) => {
       context.filter = "saturate(.92) contrast(1.02) brightness(.94)";
       drawGameGlassCrop(context, winter);
     });
     addCanvasTexture(this, "mist-view", GLASS.width, GLASS.height, (context) => {
       context.filter = "saturate(.94) contrast(1.01) brightness(.92)";
-      drawGameGlassCrop(context, warmRain, { x: 178, y: 108, width: 924, height: 480 });
+      drawGameGlassCrop(context, warmRain);
     });
     addCanvasTexture(this, "shower-view", GLASS.width, GLASS.height, (context) => {
       context.filter = "saturate(.92) contrast(1.01) brightness(.92)";
-      drawGameGlassCrop(context, shower, { x: 195, y: 140, width: 890, height: 463 });
+      drawGameGlassCrop(context, shower);
     });
     addCanvasTexture(this, "frost-source", GLASS.width, GLASS.height, (context) => {
       context.filter = "saturate(.6) contrast(.94) brightness(1.1)";
@@ -856,8 +976,8 @@ class FrostScene extends Phaser.Scene {
       .setDisplaySize(GAME.width, GAME.height)
       .setDepth(-2);
     this.ambientLayer = this.add.graphics().setDepth(-1);
-
-    this.frame = this.add.graphics();
+    this.surfaceMaskShape = this.make.graphics({}, false);
+    this.surfaceLayer = this.add.layer().setDepth(1);
 
     this.glassShader = this.add.shader(
         {
@@ -879,25 +999,39 @@ class FrostScene extends Phaser.Scene {
         GLASS.width,
         GLASS.height,
         [theme.view, "wet-map", "frost-live"],
-      )
-      .setDepth(1);
+      );
 
-    this.blurred = this.add.image(GLASS.x, GLASS.y, theme.view).setOrigin(0).setDepth(2).enableFilters();
+    this.blurred = this.add.image(GLASS.x, GLASS.y, theme.view).setOrigin(0).enableFilters();
     this.blurred.filters?.internal.addBlur(1, 2, 2, 1.25, 0xffffff, 3);
     this.blurred.filters?.internal.addMask("frost-live");
 
-    this.glassOverlay = this.add.image(GLASS.x, GLASS.y, "frost-live").setOrigin(0).setAlpha(theme.overlayAlpha).setDepth(3);
-
-    this.glassEdge = this.add.graphics().setDepth(9);
-
-    this.wetLayer = this.add.graphics().setDepth(6);
-    this.phaseOverlay = this.add.graphics().setDepth(7);
-    this.beatFlash = this.add.graphics().setDepth(8.5).setAlpha(0);
+    this.glassOverlay = this.add.image(GLASS.x, GLASS.y, "frost-live").setOrigin(0).setAlpha(theme.overlayAlpha);
+    this.wetLayer = this.add.graphics();
+    this.phaseOverlay = this.add.graphics();
+    this.dropLayer = this.add.container();
+    this.beatFlash = this.add.graphics().setAlpha(0);
+    this.surfaceLayer.add([
+      this.glassShader,
+      this.blurred,
+      this.glassOverlay,
+      this.wetLayer,
+      this.phaseOverlay,
+      this.dropLayer,
+      this.beatFlash,
+    ]);
+    this.surfaceLayer.enableFilters();
+    if (!this.surfaceLayer.filters) throw new Error("유리 윤곽 마스크를 만들 수 없습니다.");
+    this.surfaceMaskFilter = this.surfaceLayer.filters.external.addMask(this.surfaceMaskShape, false, this.cameras.main);
+    this.surfaceMaskFilter.autoUpdate = false;
+    this.stageForeground = this.add
+      .image(GAME.width / 2, GAME.height / 2, `${this.theme}-foreground`)
+      .setDisplaySize(GAME.width, GAME.height)
+      .setDepth(8.8);
     this.divider = this.add.graphics().setDepth(9);
     this.drawSurfaceFrame();
 
     this.add
-      .text(GLASS.x + GLASS.width * 0.25, GLASS.y + 29, "\u2460 \uB4E3\uAE30", {
+      .text(GLASS.x + GLASS.width * 0.25, 142, "\u2460 \uB4E3\uAE30", {
         fontFamily: cssToken("--font-ui"),
         fontSize: "14px",
         fontStyle: "700",
@@ -908,7 +1042,7 @@ class FrostScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setDepth(10);
     this.add
-      .text(GLASS.x + GLASS.width * 0.75, GLASS.y + 29, "\u2461 \uB530\uB77C \uD558\uAE30", {
+      .text(GLASS.x + GLASS.width * 0.75, 142, "\u2461 \uB530\uB77C \uD558\uAE30", {
         fontFamily: cssToken("--font-ui"),
         fontSize: "14px",
         fontStyle: "700",
@@ -988,6 +1122,7 @@ class FrostScene extends Phaser.Scene {
     document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')?.setAttribute("content", cssToken("--color-canvas"));
     this.cameras.main.setBackgroundColor(cssToken("--stage-camera"));
     this.stageBackdrop.setTexture(theme.backdrop);
+    this.stageForeground.setTexture(`${this.theme}-foreground`);
     this.drawSurfaceFrame();
     this.glassShader.setTextures([theme.view, "wet-map", "frost-live"]);
     this.glassShader.setUniform("uWarm", theme.warm);
@@ -1003,103 +1138,22 @@ class FrostScene extends Phaser.Scene {
   }
 
   private drawSurfaceFrame() {
-    const frame = this.frame.clear();
-    const edge = this.glassEdge.clear();
+    const shape = SURFACE_SHAPES[this.theme];
+    this.surfacePolygon.setTo(shape.points);
+    const mask = this.surfaceMaskShape.clear().fillStyle(0xffffff, 1).beginPath();
+    mask.moveTo(shape.points[0].x, shape.points[0].y);
+    shape.points.slice(1).forEach((point) => mask.lineTo(point.x, point.y));
+    mask.closePath().fillPath();
+    if (this.surfaceMaskFilter) this.surfaceMaskFilter.needsUpdate = true;
+
     const divider = this.divider.clear();
-
-    if (this.theme === "frost") {
-      frame.fillStyle(0xc58f65, 1);
-      frame.fillRoundedRect(GLASS.x - 26, 55, GLASS.width + 52, 610, 24);
-      frame.fillStyle(0x3f3028, 0.38);
-      frame.fillRoundedRect(GLASS.x - 25, GLASS.y - 19, GLASS.width + 50, GLASS.height + 42, 22);
-      frame.fillStyle(0xefd2a2, 1);
-      frame.fillRoundedRect(GLASS.x - 20, GLASS.y - 16, GLASS.width + 40, GLASS.height + 32, 18);
-      frame.lineStyle(3, 0x674a37, 0.9);
-      frame.strokeRoundedRect(GLASS.x - 18, GLASS.y - 14, GLASS.width + 36, GLASS.height + 28, 16);
-      frame.fillStyle(0x4b372c, 0.96);
-      frame.fillRoundedRect(GLASS.x - 8, GLASS.y - 7, GLASS.width + 16, GLASS.height + 14, 9);
-      frame.lineStyle(1, 0xb9875f, 0.7);
-      frame.lineBetween(GLASS.x + 30, GLASS.y - 10, GLASS.x + GLASS.width * 0.42, GLASS.y - 12);
-      frame.lineBetween(GLASS.x + GLASS.width * 0.58, GLASS.y + GLASS.height + 11, GLASS.x + GLASS.width - 34, GLASS.y + GLASS.height + 9);
-
-      edge.lineStyle(10, 0x4b372c, 0.96);
-      edge.strokeRoundedRect(GLASS.x - 2, GLASS.y - 2, GLASS.width + 4, GLASS.height + 4, 10);
-      edge.lineStyle(2, 0xffedc9, 0.72);
-      edge.strokeRoundedRect(GLASS.x + 2, GLASS.y + 2, GLASS.width - 4, GLASS.height - 4, 7);
-      edge.lineStyle(2, 0x4b372c, 0.72);
-      edge.strokeRoundedRect(GLASS.x - 1, GLASS.y - 1, GLASS.width + 2, GLASS.height + 2, 9);
-
-      divider.lineStyle(9, 0x4b372c, 0.96);
-      divider.lineBetween(GAME.width / 2, GLASS.y - 1, GAME.width / 2, GLASS.y + GLASS.height + 1);
-      divider.lineStyle(2, 0xf2d5a7, 0.62);
-      divider.lineBetween(GAME.width / 2 + 2, GLASS.y + 8, GAME.width / 2 + 1, GLASS.y + GLASS.height - 8);
-      return;
-    }
-
-    if (this.theme === "mist") {
-      frame.fillStyle(0x100f13, 0.78);
-      frame.fillRect(GLASS.x - 120, GLASS.y - 46, GLASS.width + 240, 46);
-      frame.fillTriangle(GLASS.x - 120, GLASS.y - 46, GLASS.x, GLASS.y, GLASS.x, GLASS.y + GLASS.height);
-      frame.fillTriangle(GLASS.x - 120, GLASS.y - 46, GLASS.x - 120, GLASS.y + GLASS.height + 38, GLASS.x, GLASS.y + GLASS.height);
-      frame.fillTriangle(GLASS.x + GLASS.width + 120, GLASS.y - 46, GLASS.x + GLASS.width, GLASS.y, GLASS.x + GLASS.width, GLASS.y + GLASS.height);
-      frame.fillTriangle(
-        GLASS.x + GLASS.width + 120,
-        GLASS.y - 46,
-        GLASS.x + GLASS.width + 120,
-        GLASS.y + GLASS.height + 38,
-        GLASS.x + GLASS.width,
-        GLASS.y + GLASS.height,
-      );
-      frame.fillRect(GLASS.x - 92, GLASS.y + GLASS.height, GLASS.width + 184, 38);
-      frame.fillStyle(0x100f13, 0.46);
-      frame.fillRoundedRect(GLASS.x - 13, GLASS.y - 11, GLASS.width + 26, GLASS.height + 22, 15);
-      frame.fillStyle(0x291b2b, 0.98);
-      frame.fillRoundedRect(GLASS.x - 9, GLASS.y - 8, GLASS.width + 18, GLASS.height + 16, 12);
-      frame.fillStyle(0x17171b, 0.98);
-      frame.fillRoundedRect(GLASS.x - 4, GLASS.y - 4, GLASS.width + 8, GLASS.height + 8, 9);
-      frame.lineStyle(1, 0x8e657f, 0.46);
-      frame.strokeRoundedRect(GLASS.x - 8, GLASS.y - 7, GLASS.width + 16, GLASS.height + 14, 11);
-
-      edge.lineStyle(10, 0x17171b, 0.98);
-      edge.strokeRoundedRect(GLASS.x - 2, GLASS.y - 2, GLASS.width + 4, GLASS.height + 4, 10);
-      edge.lineStyle(2, 0x241823, 0.9);
-      edge.strokeRoundedRect(GLASS.x - 1, GLASS.y - 1, GLASS.width + 2, GLASS.height + 2, 8);
-      edge.lineStyle(1, 0xbc91aa, 0.42);
-      edge.strokeRoundedRect(GLASS.x + 2, GLASS.y + 2, GLASS.width - 4, GLASS.height - 4, 6);
-
-      divider.lineStyle(3, 0x18151a, 0.94);
-      divider.lineBetween(GAME.width / 2, GLASS.y, GAME.width / 2, GLASS.y + GLASS.height);
-      divider.lineStyle(1, 0xa67592, 0.5);
-      divider.lineBetween(GAME.width / 2 + 1, GLASS.y + 10, GAME.width / 2 + 1, GLASS.y + GLASS.height - 10);
-      return;
-    }
-
-    frame.fillStyle(0x7ebdaf, 1);
-    frame.fillRoundedRect(GLASS.x - 28, 54, GLASS.width + 56, 571, 24);
-    frame.fillStyle(0xffefd2, 1);
-    frame.fillRoundedRect(GLASS.x - 22, 62, GLASS.width + 44, 559, 20);
-    frame.fillStyle(0x123f3c, 0.3);
-    frame.fillRoundedRect(GLASS.x - 20, GLASS.y - 16, GLASS.width + 40, GLASS.height + 34, 20);
-    frame.fillStyle(0xbfe5d8, 1);
-    frame.fillRoundedRect(GLASS.x - 16, GLASS.y - 14, GLASS.width + 32, GLASS.height + 28, 17);
-    frame.fillStyle(0xffefd2, 1);
-    frame.fillRoundedRect(GLASS.x - 11, GLASS.y - 10, GLASS.width + 22, GLASS.height + 20, 13);
-    frame.lineStyle(2, 0x5d9c90, 0.72);
-    frame.strokeRoundedRect(GLASS.x - 14, GLASS.y - 12, GLASS.width + 28, GLASS.height + 24, 15);
-    frame.fillStyle(0x174c48, 0.94);
-    frame.fillRoundedRect(GLASS.x - 5, GLASS.y - 5, GLASS.width + 10, GLASS.height + 10, 9);
-
-    edge.lineStyle(10, 0x174c48, 0.96);
-    edge.strokeRoundedRect(GLASS.x - 2, GLASS.y - 2, GLASS.width + 4, GLASS.height + 4, 10);
-    edge.lineStyle(2, 0xe9fff5, 0.66);
-    edge.strokeRoundedRect(GLASS.x + 2, GLASS.y + 2, GLASS.width - 4, GLASS.height - 4, 7);
-    edge.lineStyle(2, 0x205e58, 0.72);
-    edge.strokeRoundedRect(GLASS.x - 1, GLASS.y - 1, GLASS.width + 2, GLASS.height + 2, 9);
-
-    divider.lineStyle(5, 0x174c48, 0.96);
-    divider.lineBetween(GAME.width / 2, GLASS.y, GAME.width / 2, GLASS.y + GLASS.height);
-    divider.lineStyle(1, 0xc9f0e2, 0.58);
-    divider.lineBetween(GAME.width / 2 + 1, GLASS.y + 9, GAME.width / 2 + 1, GLASS.y + GLASS.height - 9);
+    const color = this.theme === "frost" ? 0x4b372c : this.theme === "mist" ? 0x18151a : 0x174c48;
+    const highlight = this.theme === "frost" ? 0xf2d5a7 : this.theme === "mist" ? 0xa67592 : 0xc9f0e2;
+    const width = this.theme === "frost" ? 7 : this.theme === "mist" ? 3 : 5;
+    divider.lineStyle(width, color, 0.88);
+    divider.lineBetween(GAME.width / 2, shape.divider[0], GAME.width / 2, shape.divider[1]);
+    divider.lineStyle(1, highlight, 0.48);
+    divider.lineBetween(GAME.width / 2 + 1, shape.divider[0] + 8, GAME.width / 2 + 1, shape.divider[1] - 8);
   }
 
   private drawAmbient(time: number) {
@@ -1601,9 +1655,7 @@ class FrostScene extends Phaser.Scene {
   private insideResponsePane(point: Point) {
     return (
       point.x >= GAME.width / 2 + 8 &&
-      point.x <= GLASS.x + GLASS.width &&
-      point.y >= GLASS.y &&
-      point.y <= GLASS.y + GLASS.height
+      Phaser.Geom.Polygon.Contains(this.surfacePolygon, point.x, point.y)
     );
   }
 
@@ -1777,6 +1829,7 @@ class FrostScene extends Phaser.Scene {
       .setDisplaySize(radius * 3.2, radius * 3.2)
       .setAlpha(radius > 10 ? 0.96 : radius > 6 ? 0.9 : 0.82)
       .setDepth(8);
+    this.dropLayer.add(sprite);
     if (this.theme === "shower") sprite.setTint(0xd9fffb);
     this.drops.push({
       x,
@@ -1935,8 +1988,8 @@ class FrostScene extends Phaser.Scene {
   }
 
   private showGuideStroke(index: number) {
-    const y = GLASS.y + 135 + (index % 4) * 92;
-    const left = GLASS.x + 180;
+    const y = 243 + (index % 4) * 92;
+    const left = 330;
     const right = GAME.width / 2 - 135;
     const forward = index % 2 === 0;
     const from = { x: forward ? left : right, y };
