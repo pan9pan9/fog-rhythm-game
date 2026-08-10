@@ -9,11 +9,12 @@ const MAX_DROPS = 5;
 const PROGRESS_KEY = "fog-rhythm:level-progress-v1";
 const RHYTHM_TICKS = 12;
 const PORTRAIT_GAME = window.matchMedia("(orientation: portrait) and (max-width: 640px)");
+const REDUCED_MOTION = window.matchMedia("(prefers-reduced-motion: reduce)");
 
 const THEMES = {
   mist: {
     button: "2단계 · 김 서림",
-    backdrop: "mist-cartoon",
+    backdrop: "mist-handdrawn",
     view: "mist-view",
     source: "mist-source",
     ridge: "mist-ridge",
@@ -24,7 +25,7 @@ const THEMES = {
   },
   frost: {
     button: "1단계 · 겨울 성에",
-    backdrop: "frost-cartoon",
+    backdrop: "frost-handdrawn",
     view: "winter-view",
     source: "frost-source",
     ridge: "frost-ridge",
@@ -35,7 +36,7 @@ const THEMES = {
   },
   shower: {
     button: "3단계 · 샤워 거울",
-    backdrop: "shower-cartoon",
+    backdrop: "shower-handdrawn",
     view: "shower-view",
     source: "shower-source",
     ridge: "shower-ridge",
@@ -179,6 +180,7 @@ uniform vec2 uTexel;
 uniform float uStrength;
 uniform float uWarm;
 uniform float uTime;
+uniform float uBeat;
 varying vec2 outTexCoord;
 
 vec3 sceneAt (vec2 point) {
@@ -243,6 +245,7 @@ void main () {
     vec3 fogTint = mix(vec3(0.94, 0.91, 0.87), vec3(0.86, 0.96, 0.93), shower);
     color += wetLight * (fresnel * 0.12 + specular * 0.48);
     color = mix(color, fogTint, fog * mix(0.14, 0.2, shower));
+    color += wetLight * uBeat * 0.035;
     gl_FragColor = vec4(color, 1.0);
     return;
   }
@@ -260,6 +263,7 @@ void main () {
   color -= vec3(0.05, 0.075, 0.08) * rim;
   color += vec3(0.56, 0.76, 0.82) * rim * 0.28;
   color += vec3(1.0, 0.98, 0.92) * specular * 0.9;
+  color += vec3(0.82, 0.95, 1.0) * uBeat * 0.035;
   gl_FragColor = vec4(color, 1.0);
 }`;
 
@@ -389,15 +393,19 @@ function drawCover(context: CanvasRenderingContext2D, source: HTMLImageElement) 
   context.drawImage(source, sx, sy, sw, sh, 0, 0, GLASS.width, GLASS.height);
 }
 
-function drawGameGlassCrop(context: CanvasRenderingContext2D, source: HTMLImageElement) {
+function drawGameGlassCrop(
+  context: CanvasRenderingContext2D,
+  source: HTMLImageElement,
+  sourceRect: { x: number; y: number; width: number; height: number } = GLASS,
+) {
   const scaleX = source.naturalWidth / GAME.width;
   const scaleY = source.naturalHeight / GAME.height;
   context.drawImage(
     source,
-    GLASS.x * scaleX,
-    GLASS.y * scaleY,
-    GLASS.width * scaleX,
-    GLASS.height * scaleY,
+    sourceRect.x * scaleX,
+    sourceRect.y * scaleY,
+    sourceRect.width * scaleX,
+    sourceRect.height * scaleY,
     0,
     0,
     GLASS.width,
@@ -686,11 +694,17 @@ class FrostScene extends Phaser.Scene {
   private frost!: Phaser.Textures.DynamicTexture;
   private waterMap!: Phaser.Textures.DynamicTexture;
   private stageBackdrop!: Phaser.GameObjects.Image;
+  private ambientLayer!: Phaser.GameObjects.Graphics;
+  private frame!: Phaser.GameObjects.Graphics;
+  private glassEdge!: Phaser.GameObjects.Graphics;
+  private divider!: Phaser.GameObjects.Graphics;
   private glassShader!: Phaser.GameObjects.Shader;
   private blurred!: Phaser.GameObjects.Image;
   private glassOverlay!: Phaser.GameObjects.Image;
   private wetLayer!: Phaser.GameObjects.Graphics;
   private phaseOverlay!: Phaser.GameObjects.Graphics;
+  private beatFlash!: Phaser.GameObjects.Graphics;
+  private hitBurst!: Phaser.GameObjects.Graphics;
   private finger!: Phaser.GameObjects.Image;
   private guideFinger!: Phaser.GameObjects.Image;
   private contact!: Phaser.GameObjects.Ellipse;
@@ -744,6 +758,7 @@ class FrostScene extends Phaser.Scene {
   private squeakTravel = 0;
   private lastSqueakAt = 0;
   private audioAmount = 0;
+  private beatEnergy = 0;
   private audio?: {
     context: AudioContext;
     source: AudioBufferSourceNode;
@@ -761,11 +776,11 @@ class FrostScene extends Phaser.Scene {
   }
 
   preload() {
-    this.load.image("frost-cartoon", "/assets/stage-frost-cartoon.webp");
-    this.load.image("mist-cartoon", "/assets/stage-mist-cartoon.webp");
-    this.load.image("shower-cartoon", "/assets/stage-shower-cartoon.webp");
+    this.load.image("frost-handdrawn", "/assets/stage-frost-pov.webp");
+    this.load.image("mist-handdrawn", "/assets/stage-mist-pov.webp");
+    this.load.image("shower-handdrawn", "/assets/stage-shower-pov.webp");
     this.load.image("frost-photo", "/assets/wet-frost.webp");
-    this.load.image("finger-photo", "/assets/finger-cartoon.webp");
+    this.load.image("finger-photo", "/assets/finger-handdrawn.webp");
   }
 
   create() {
@@ -780,10 +795,16 @@ class FrostScene extends Phaser.Scene {
   }
 
   private createTextures() {
-    const winter = this.textures.get("frost-cartoon").getSourceImage() as HTMLImageElement;
-    const warmRain = this.textures.get("mist-cartoon").getSourceImage() as HTMLImageElement;
-    const shower = this.textures.get("shower-cartoon").getSourceImage() as HTMLImageElement;
+    const winter = this.textures.get("frost-handdrawn").getSourceImage() as HTMLImageElement;
+    const warmRain = this.textures.get("mist-handdrawn").getSourceImage() as HTMLImageElement;
+    const shower = this.textures.get("shower-handdrawn").getSourceImage() as HTMLImageElement;
     const frostPhoto = this.textures.get("frost-photo").getSourceImage() as HTMLImageElement;
+    if (import.meta.env.DEV) {
+      console.assert(
+        [winter, warmRain, shower].every((image) => image.naturalWidth === GAME.width && image.naturalHeight === GAME.height),
+        "POV 원화는 게임 좌표와 같은 1280×720이어야 유리 크롭이 맞습니다.",
+      );
+    }
 
     addCanvasTexture(this, "winter-view", GLASS.width, GLASS.height, (context) => {
       context.filter = "saturate(.92) contrast(1.02) brightness(.94)";
@@ -791,11 +812,11 @@ class FrostScene extends Phaser.Scene {
     });
     addCanvasTexture(this, "mist-view", GLASS.width, GLASS.height, (context) => {
       context.filter = "saturate(.94) contrast(1.01) brightness(.92)";
-      drawGameGlassCrop(context, warmRain);
+      drawGameGlassCrop(context, warmRain, { x: 178, y: 108, width: 924, height: 480 });
     });
     addCanvasTexture(this, "shower-view", GLASS.width, GLASS.height, (context) => {
       context.filter = "saturate(.92) contrast(1.01) brightness(.92)";
-      drawGameGlassCrop(context, shower);
+      drawGameGlassCrop(context, shower, { x: 195, y: 140, width: 890, height: 463 });
     });
     addCanvasTexture(this, "frost-source", GLASS.width, GLASS.height, (context) => {
       context.filter = "saturate(.6) contrast(.94) brightness(1.1)";
@@ -834,16 +855,9 @@ class FrostScene extends Phaser.Scene {
       .image(GAME.width / 2, GAME.height / 2, theme.backdrop)
       .setDisplaySize(GAME.width, GAME.height)
       .setDepth(-2);
+    this.ambientLayer = this.add.graphics().setDepth(-1);
 
-    const frame = this.add.graphics();
-    frame.fillStyle(0x10181b, 0.42);
-    frame.fillRoundedRect(GLASS.x - 27, GLASS.y - 21, GLASS.width + 54, GLASS.height + 50, 24);
-    frame.fillStyle(0xf0e4cc, 1);
-    frame.fillRoundedRect(GLASS.x - 20, GLASS.y - 16, GLASS.width + 40, GLASS.height + 32, 20);
-    frame.lineStyle(2, 0xfff7e8, 0.92);
-    frame.strokeRoundedRect(GLASS.x - 17, GLASS.y - 13, GLASS.width + 34, GLASS.height + 26, 17);
-    frame.fillStyle(0x293437, 1);
-    frame.fillRoundedRect(GLASS.x - 10, GLASS.y - 8, GLASS.width + 20, GLASS.height + 16, 12);
+    this.frame = this.add.graphics();
 
     this.glassShader = this.add.shader(
         {
@@ -857,6 +871,7 @@ class FrostScene extends Phaser.Scene {
             uStrength: 0.018,
             uWarm: theme.warm,
             uTime: 0,
+            uBeat: 0,
           },
         },
         GLASS.x + GLASS.width / 2,
@@ -873,64 +888,54 @@ class FrostScene extends Phaser.Scene {
 
     this.glassOverlay = this.add.image(GLASS.x, GLASS.y, "frost-live").setOrigin(0).setAlpha(theme.overlayAlpha).setDepth(3);
 
-    const glassEdge = this.add.graphics().setDepth(9);
-    glassEdge.lineStyle(2, 0xfff7e6, 0.58);
-    glassEdge.strokeRoundedRect(GLASS.x + 2, GLASS.y + 2, GLASS.width - 4, GLASS.height - 4, 8);
-    glassEdge.lineStyle(2, 0x172225, 0.56);
-    glassEdge.strokeRoundedRect(GLASS.x - 2, GLASS.y - 2, GLASS.width + 4, GLASS.height + 4, 10);
+    this.glassEdge = this.add.graphics().setDepth(9);
 
     this.wetLayer = this.add.graphics().setDepth(6);
     this.phaseOverlay = this.add.graphics().setDepth(7);
-    const divider = this.add.graphics().setDepth(9);
-    divider.fillStyle(0x263235, 0.96);
-    divider.fillRoundedRect(GAME.width / 2 - 7, GLASS.y - 2, 14, GLASS.height + 4, 7);
-    divider.fillStyle(0xf5ead5, 0.76);
-    divider.fillRoundedRect(GAME.width / 2 - 2, GLASS.y + 12, 4, GLASS.height - 24, 2);
+    this.beatFlash = this.add.graphics().setDepth(8.5).setAlpha(0);
+    this.divider = this.add.graphics().setDepth(9);
+    this.drawSurfaceFrame();
 
-    const labelBack = this.add.graphics().setDepth(9);
-    for (const x of [GLASS.x + GLASS.width * 0.25, GLASS.x + GLASS.width * 0.75]) {
-      labelBack.fillStyle(0xf5ead7, 0.94);
-      labelBack.fillRoundedRect(x - 54, GLASS.y + 12, 108, 34, 17);
-      labelBack.lineStyle(1, 0x263235, 0.3);
-      labelBack.strokeRoundedRect(x - 54, GLASS.y + 12, 108, 34, 17);
-    }
     this.add
       .text(GLASS.x + GLASS.width * 0.25, GLASS.y + 29, "\u2460 \uB4E3\uAE30", {
         fontFamily: cssToken("--font-ui"),
-        fontSize: "13px",
-        fontStyle: "600",
-        color: "#263235",
+        fontSize: "14px",
+        fontStyle: "700",
+        color: "#fff0cf",
+        stroke: "#263235",
+        strokeThickness: 5,
       })
       .setOrigin(0.5)
-      .setShadow(0, 1, "rgba(255,255,255,.5)", 1)
       .setDepth(10);
     this.add
       .text(GLASS.x + GLASS.width * 0.75, GLASS.y + 29, "\u2461 \uB530\uB77C \uD558\uAE30", {
         fontFamily: cssToken("--font-ui"),
-        fontSize: "13px",
-        fontStyle: "600",
-        color: "#263235",
+        fontSize: "14px",
+        fontStyle: "700",
+        color: "#fff0cf",
+        stroke: "#263235",
+        strokeThickness: 5,
       })
       .setOrigin(0.5)
-      .setShadow(0, 1, "rgba(255,255,255,.5)", 1)
       .setDepth(10);
     this.contact = this.add.ellipse(GLASS.x, GLASS.y, 88, 35, 0xffedc7, 0.12).setDepth(10).setVisible(false);
     this.contact.setStrokeStyle(2, 0xfff8e6, 0.62);
     this.finger = this.add
       .image(GLASS.x, GLASS.y, "finger-photo")
-      .setOrigin(0.5, 0.87)
-      .setDisplaySize(138, 207)
+      .setOrigin(0.5, 0.986)
+      .setDisplaySize(112, 210)
       .setDepth(11)
       .setVisible(false);
     this.guideFinger = this.add
       .image(GLASS.x, GLASS.y, "finger-photo")
-      .setOrigin(0.5, 0.87)
-      .setDisplaySize(120, 180)
+      .setOrigin(0.5, 0.986)
+      .setDisplaySize(96, 180)
       .setTint(0xfff1c9)
       .setBlendMode(Phaser.BlendModes.SCREEN)
       .setAlpha(0.46)
       .setDepth(11)
       .setVisible(false);
+    this.hitBurst = this.add.graphics().setDepth(10.5).setAlpha(0);
   }
 
   private bindInput() {
@@ -959,6 +964,7 @@ class FrostScene extends Phaser.Scene {
     this.menu?.addEventListener("click", this.handleMenuClick);
     this.clearNext?.addEventListener("click", this.handleClearNext);
     this.clearMenu?.addEventListener("click", this.showMenu);
+    this.gameElement?.addEventListener("keydown", this.handleGameKeydown);
     PORTRAIT_GAME.addEventListener("change", this.handleOrientation);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.resetButton?.removeEventListener("click", this.restartLevel);
@@ -966,6 +972,7 @@ class FrostScene extends Phaser.Scene {
       this.menu?.removeEventListener("click", this.handleMenuClick);
       this.clearNext?.removeEventListener("click", this.handleClearNext);
       this.clearMenu?.removeEventListener("click", this.showMenu);
+      this.gameElement?.removeEventListener("keydown", this.handleGameKeydown);
       PORTRAIT_GAME.removeEventListener("change", this.handleOrientation);
       this.drops.forEach((drop) => drop.sprite.destroy());
       this.cancelRhythm();
@@ -981,6 +988,7 @@ class FrostScene extends Phaser.Scene {
     document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')?.setAttribute("content", cssToken("--color-canvas"));
     this.cameras.main.setBackgroundColor(cssToken("--stage-camera"));
     this.stageBackdrop.setTexture(theme.backdrop);
+    this.drawSurfaceFrame();
     this.glassShader.setTextures([theme.view, "wet-map", "frost-live"]);
     this.glassShader.setUniform("uWarm", theme.warm);
     this.blurred.setTexture(theme.view);
@@ -992,6 +1000,197 @@ class FrostScene extends Phaser.Scene {
       this.resetButton.setAttribute("aria-label", "현재 레벨 다시 시작");
     }
     if (reset) this.resetSurface();
+  }
+
+  private drawSurfaceFrame() {
+    const frame = this.frame.clear();
+    const edge = this.glassEdge.clear();
+    const divider = this.divider.clear();
+
+    if (this.theme === "frost") {
+      frame.fillStyle(0xc58f65, 1);
+      frame.fillRoundedRect(GLASS.x - 26, 55, GLASS.width + 52, 610, 24);
+      frame.fillStyle(0x3f3028, 0.38);
+      frame.fillRoundedRect(GLASS.x - 25, GLASS.y - 19, GLASS.width + 50, GLASS.height + 42, 22);
+      frame.fillStyle(0xefd2a2, 1);
+      frame.fillRoundedRect(GLASS.x - 20, GLASS.y - 16, GLASS.width + 40, GLASS.height + 32, 18);
+      frame.lineStyle(3, 0x674a37, 0.9);
+      frame.strokeRoundedRect(GLASS.x - 18, GLASS.y - 14, GLASS.width + 36, GLASS.height + 28, 16);
+      frame.fillStyle(0x4b372c, 0.96);
+      frame.fillRoundedRect(GLASS.x - 8, GLASS.y - 7, GLASS.width + 16, GLASS.height + 14, 9);
+      frame.lineStyle(1, 0xb9875f, 0.7);
+      frame.lineBetween(GLASS.x + 30, GLASS.y - 10, GLASS.x + GLASS.width * 0.42, GLASS.y - 12);
+      frame.lineBetween(GLASS.x + GLASS.width * 0.58, GLASS.y + GLASS.height + 11, GLASS.x + GLASS.width - 34, GLASS.y + GLASS.height + 9);
+
+      edge.lineStyle(10, 0x4b372c, 0.96);
+      edge.strokeRoundedRect(GLASS.x - 2, GLASS.y - 2, GLASS.width + 4, GLASS.height + 4, 10);
+      edge.lineStyle(2, 0xffedc9, 0.72);
+      edge.strokeRoundedRect(GLASS.x + 2, GLASS.y + 2, GLASS.width - 4, GLASS.height - 4, 7);
+      edge.lineStyle(2, 0x4b372c, 0.72);
+      edge.strokeRoundedRect(GLASS.x - 1, GLASS.y - 1, GLASS.width + 2, GLASS.height + 2, 9);
+
+      divider.lineStyle(9, 0x4b372c, 0.96);
+      divider.lineBetween(GAME.width / 2, GLASS.y - 1, GAME.width / 2, GLASS.y + GLASS.height + 1);
+      divider.lineStyle(2, 0xf2d5a7, 0.62);
+      divider.lineBetween(GAME.width / 2 + 2, GLASS.y + 8, GAME.width / 2 + 1, GLASS.y + GLASS.height - 8);
+      return;
+    }
+
+    if (this.theme === "mist") {
+      frame.fillStyle(0x100f13, 0.78);
+      frame.fillRect(GLASS.x - 120, GLASS.y - 46, GLASS.width + 240, 46);
+      frame.fillTriangle(GLASS.x - 120, GLASS.y - 46, GLASS.x, GLASS.y, GLASS.x, GLASS.y + GLASS.height);
+      frame.fillTriangle(GLASS.x - 120, GLASS.y - 46, GLASS.x - 120, GLASS.y + GLASS.height + 38, GLASS.x, GLASS.y + GLASS.height);
+      frame.fillTriangle(GLASS.x + GLASS.width + 120, GLASS.y - 46, GLASS.x + GLASS.width, GLASS.y, GLASS.x + GLASS.width, GLASS.y + GLASS.height);
+      frame.fillTriangle(
+        GLASS.x + GLASS.width + 120,
+        GLASS.y - 46,
+        GLASS.x + GLASS.width + 120,
+        GLASS.y + GLASS.height + 38,
+        GLASS.x + GLASS.width,
+        GLASS.y + GLASS.height,
+      );
+      frame.fillRect(GLASS.x - 92, GLASS.y + GLASS.height, GLASS.width + 184, 38);
+      frame.fillStyle(0x100f13, 0.46);
+      frame.fillRoundedRect(GLASS.x - 13, GLASS.y - 11, GLASS.width + 26, GLASS.height + 22, 15);
+      frame.fillStyle(0x291b2b, 0.98);
+      frame.fillRoundedRect(GLASS.x - 9, GLASS.y - 8, GLASS.width + 18, GLASS.height + 16, 12);
+      frame.fillStyle(0x17171b, 0.98);
+      frame.fillRoundedRect(GLASS.x - 4, GLASS.y - 4, GLASS.width + 8, GLASS.height + 8, 9);
+      frame.lineStyle(1, 0x8e657f, 0.46);
+      frame.strokeRoundedRect(GLASS.x - 8, GLASS.y - 7, GLASS.width + 16, GLASS.height + 14, 11);
+
+      edge.lineStyle(10, 0x17171b, 0.98);
+      edge.strokeRoundedRect(GLASS.x - 2, GLASS.y - 2, GLASS.width + 4, GLASS.height + 4, 10);
+      edge.lineStyle(2, 0x241823, 0.9);
+      edge.strokeRoundedRect(GLASS.x - 1, GLASS.y - 1, GLASS.width + 2, GLASS.height + 2, 8);
+      edge.lineStyle(1, 0xbc91aa, 0.42);
+      edge.strokeRoundedRect(GLASS.x + 2, GLASS.y + 2, GLASS.width - 4, GLASS.height - 4, 6);
+
+      divider.lineStyle(3, 0x18151a, 0.94);
+      divider.lineBetween(GAME.width / 2, GLASS.y, GAME.width / 2, GLASS.y + GLASS.height);
+      divider.lineStyle(1, 0xa67592, 0.5);
+      divider.lineBetween(GAME.width / 2 + 1, GLASS.y + 10, GAME.width / 2 + 1, GLASS.y + GLASS.height - 10);
+      return;
+    }
+
+    frame.fillStyle(0x7ebdaf, 1);
+    frame.fillRoundedRect(GLASS.x - 28, 54, GLASS.width + 56, 571, 24);
+    frame.fillStyle(0xffefd2, 1);
+    frame.fillRoundedRect(GLASS.x - 22, 62, GLASS.width + 44, 559, 20);
+    frame.fillStyle(0x123f3c, 0.3);
+    frame.fillRoundedRect(GLASS.x - 20, GLASS.y - 16, GLASS.width + 40, GLASS.height + 34, 20);
+    frame.fillStyle(0xbfe5d8, 1);
+    frame.fillRoundedRect(GLASS.x - 16, GLASS.y - 14, GLASS.width + 32, GLASS.height + 28, 17);
+    frame.fillStyle(0xffefd2, 1);
+    frame.fillRoundedRect(GLASS.x - 11, GLASS.y - 10, GLASS.width + 22, GLASS.height + 20, 13);
+    frame.lineStyle(2, 0x5d9c90, 0.72);
+    frame.strokeRoundedRect(GLASS.x - 14, GLASS.y - 12, GLASS.width + 28, GLASS.height + 24, 15);
+    frame.fillStyle(0x174c48, 0.94);
+    frame.fillRoundedRect(GLASS.x - 5, GLASS.y - 5, GLASS.width + 10, GLASS.height + 10, 9);
+
+    edge.lineStyle(10, 0x174c48, 0.96);
+    edge.strokeRoundedRect(GLASS.x - 2, GLASS.y - 2, GLASS.width + 4, GLASS.height + 4, 10);
+    edge.lineStyle(2, 0xe9fff5, 0.66);
+    edge.strokeRoundedRect(GLASS.x + 2, GLASS.y + 2, GLASS.width - 4, GLASS.height - 4, 7);
+    edge.lineStyle(2, 0x205e58, 0.72);
+    edge.strokeRoundedRect(GLASS.x - 1, GLASS.y - 1, GLASS.width + 2, GLASS.height + 2, 9);
+
+    divider.lineStyle(5, 0x174c48, 0.96);
+    divider.lineBetween(GAME.width / 2, GLASS.y, GAME.width / 2, GLASS.y + GLASS.height);
+    divider.lineStyle(1, 0xc9f0e2, 0.58);
+    divider.lineBetween(GAME.width / 2 + 1, GLASS.y + 9, GAME.width / 2 + 1, GLASS.y + GLASS.height - 9);
+  }
+
+  private drawAmbient(time: number) {
+    const layer = this.ambientLayer;
+    const motion = time * (REDUCED_MOTION.matches ? 0.12 : 1);
+    const pulse = this.beatEnergy;
+    layer.clear();
+    if (!this.playing) return;
+
+    if (this.theme === "frost") {
+      layer.fillStyle(0xfff4d7, 0.13 + pulse * 0.08);
+      for (let index = 0; index < 11; index += 1) {
+        const x = 28 + ((index * 173 + motion * (5 + (index % 3) * 2)) % (GAME.width - 56));
+        const y = -14 + ((index * 97 + motion * (11 + (index % 2) * 3)) % (GAME.height + 28));
+        layer.fillCircle(x, y, 1.5 + (index % 3) * 0.7);
+      }
+      return;
+    }
+
+    if (this.theme === "mist") {
+      layer.lineStyle(2, 0xffd5bb, 0.12 + pulse * 0.07);
+      for (let index = 0; index < 9; index += 1) {
+        const x = -70 + ((index * 181 + motion * 29) % (GAME.width + 140));
+        const y = -50 + ((index * 109 + motion * 47) % (GAME.height + 100));
+        layer.lineBetween(x, y, x + 14, y + 31);
+      }
+      return;
+    }
+
+    layer.fillStyle(0xdffff5, 0.055 + pulse * 0.045);
+    for (let index = 0; index < 7; index += 1) {
+      const x = 70 + ((index * 193 + Math.sin(motion * 0.22 + index) * 18) % (GAME.width - 140));
+      const y = GAME.height + 40 - ((index * 113 + motion * (13 + (index % 2) * 3)) % (GAME.height + 90));
+      layer.fillEllipse(x, y, 38 + (index % 3) * 14, 17 + (index % 2) * 7);
+    }
+  }
+
+  private pulseCue() {
+    this.beatEnergy = 1;
+    this.tweens.killTweensOf(this.beatFlash);
+    this.beatFlash.clear();
+    this.beatFlash.fillStyle(0xffedc4, 0.12);
+    this.beatFlash.fillRoundedRect(GLASS.x + 6, GLASS.y + 6, GLASS.width / 2 - 12, GLASS.height - 12, 10);
+    this.beatFlash.lineStyle(3, 0xfff2d3, 0.82);
+    this.beatFlash.strokeRoundedRect(GLASS.x + 7, GLASS.y + 7, GLASS.width / 2 - 14, GLASS.height - 14, 9);
+    this.beatFlash.setAlpha(1);
+    this.tweens.add({
+      targets: this.beatFlash,
+      alpha: 0,
+      duration: REDUCED_MOTION.matches ? 120 : 230,
+      ease: "Sine.Out",
+    });
+  }
+
+  private pulseHit(kind: "perfect" | "good" | "miss", feedbackPoint?: Point) {
+    const color = kind === "perfect" ? 0xffe78a : kind === "good" ? 0xbef8e8 : 0xff9b87;
+    const radius = kind === "perfect" ? 30 : kind === "good" ? 25 : 21;
+    const point = feedbackPoint ?? this.input.activePointer;
+    this.beatEnergy = Math.max(this.beatEnergy, kind === "perfect" ? 1 : 0.72);
+    this.tweens.killTweensOf(this.hitBurst);
+    this.hitBurst.clear();
+    this.hitBurst.fillStyle(color, 0.16);
+    this.hitBurst.fillCircle(0, 0, radius * 0.68);
+    this.hitBurst.lineStyle(kind === "miss" ? 4 : 3, color, 0.96);
+    this.hitBurst.strokeCircle(0, 0, radius);
+    this.hitBurst
+      .setPosition(
+        clamp(point.x, GAME.width / 2 + 10, GLASS.x + GLASS.width - 10),
+        clamp(point.y, GLASS.y + 10, GLASS.y + GLASS.height - 10),
+      )
+      .setScale(REDUCED_MOTION.matches ? 1 : 0.72)
+      .setAlpha(1);
+    this.tweens.add({
+      targets: this.hitBurst,
+      alpha: 0,
+      scaleX: REDUCED_MOTION.matches ? 1 : 1.65,
+      scaleY: REDUCED_MOTION.matches ? 1 : 1.65,
+      duration: REDUCED_MOTION.matches ? 130 : 260,
+      ease: "Sine.Out",
+    });
+  }
+
+  private resetVisualFeedback() {
+    this.beatEnergy = 0;
+    if (!this.sys.isActive()) return;
+    this.tweens.killTweensOf(this.beatFlash);
+    this.tweens.killTweensOf(this.hitBurst);
+    this.ambientLayer.clear();
+    this.beatFlash.clear().setAlpha(0);
+    this.hitBurst.clear().setAlpha(0).setScale(1);
+    this.glassShader.setUniform("uBeat", 0);
   }
 
   private loadProgress() {
@@ -1037,7 +1236,7 @@ class FrostScene extends Phaser.Scene {
       if (status) status.textContent = completed ? "클리어" : progress > 0 ? `${progress} / 5` : unlocked ? "플레이 가능" : "잠김";
       if (button) {
         button.disabled = !unlocked;
-        button.textContent = completed ? "다시 플레이 →" : progress > 0 ? "이어하기 →" : unlocked ? "시작하기 →" : "잠겨 있어요 ⌑";
+        button.textContent = completed ? "다시 플레이" : progress > 0 ? "이어하기" : unlocked ? "시작하기" : "잠겨 있어요";
         button.setAttribute("aria-label", `${number}단계 ${title}${unlocked ? " 시작" : ", 잠김"}`);
       }
     });
@@ -1068,7 +1267,7 @@ class FrostScene extends Phaser.Scene {
     document.documentElement.dataset.screen = "play";
     this.menu?.setAttribute("aria-hidden", "true");
     this.gameElement?.setAttribute("aria-hidden", "false");
-    this.backButton?.focus();
+    this.gameElement?.focus();
     this.scene.resume();
     this.quietAudio();
     this.applyTheme(false);
@@ -1077,6 +1276,7 @@ class FrostScene extends Phaser.Scene {
     if (token !== this.rhythmToken || !this.playing || this.theme !== theme) return;
     if (PORTRAIT_GAME.matches) {
       this.quietAudio();
+      this.setPlaySurfaceInert(true);
       this.scene.pause();
       return;
     }
@@ -1106,14 +1306,25 @@ class FrostScene extends Phaser.Scene {
   private handleOrientation = () => {
     if (!this.playing || this.stageFinished) return;
     if (PORTRAIT_GAME.matches) {
+      this.setPlaySurfaceInert(true);
       this.cancelRhythm();
       this.stopRub();
       this.quietAudio();
       this.scene.pause();
       return;
     }
+    this.setPlaySurfaceInert(false);
     this.scene.resume();
     this.restartLevel();
+  };
+
+  private handleGameKeydown = (event: KeyboardEvent) => {
+    if (event.repeat || (event.key !== " " && event.key !== "Enter") || !this.acceptingRhythmInput()) return;
+    event.preventDefault();
+    this.judgeRhythmHit(event, {
+      x: GLASS.x + GLASS.width * 0.75,
+      y: GLASS.y + GLASS.height * 0.5,
+    });
   };
 
   private handleClearNext = () => {
@@ -1123,7 +1334,7 @@ class FrostScene extends Phaser.Scene {
   };
 
   private updateStageChip() {
-    if (this.stageChip) this.stageChip.textContent = THEMES[this.theme].button + " · 레벨 " + (this.levelIndex + 1) + " / 5";
+    if (this.stageChip) this.stageChip.textContent = THEMES[this.theme].button;
     if (this.levelProgress) this.levelProgress.textContent = "레벨 " + (this.levelIndex + 1) + " / 5";
   }
 
@@ -1207,7 +1418,10 @@ class FrostScene extends Phaser.Scene {
     phrase.hits.forEach((tick, index) => {
       const at = cueStart + (tick / RHYTHM_TICKS) * beatSeconds;
       this.scheduleCueHit(at);
-      this.scheduleAt(at, token, () => this.showGuideStroke(index));
+      this.scheduleAt(at, token, () => {
+        this.showGuideStroke(index);
+        this.pulseCue();
+      });
     });
     this.scheduleAt(cueStart, token, () => {
       this.phaseStart = cueStart;
@@ -1293,7 +1507,7 @@ class FrostScene extends Phaser.Scene {
   }
 
   private restartLevel = () => {
-    if (!this.playing || this.stageFinished) return;
+    if (!this.playing || this.stageFinished || PORTRAIT_GAME.matches) return;
     this.cancelRhythm();
     const token = this.rhythmToken;
     this.phraseIndex = 0;
@@ -1323,6 +1537,7 @@ class FrostScene extends Phaser.Scene {
     this.phaseEnd = 0;
     this.tweens.killTweensOf(this.guideFinger);
     this.guideFinger?.setVisible(false);
+    this.resetVisualFeedback();
     if (this.judgePop) this.judgePop.textContent = "";
     if (this.phaseOverlay) this.setRhythmPhase("idle", "");
   }
@@ -1408,7 +1623,7 @@ class FrostScene extends Phaser.Scene {
     this.strokeAnchor = point;
     this.gestureHitMade = false;
     this.contact.setPosition(point.x, point.y + 3).setVisible(true);
-    this.finger.setPosition(point.x, point.y + 7).setRotation(0.04).setAlpha(0.97).setVisible(true);
+    this.finger.setPosition(point.x, point.y + 2).setRotation(0.04).setAlpha(0.97).setVisible(true);
     this.frost.erase("frost-brush", point.x - GLASS.x, point.y - GLASS.y).render();
   }
 
@@ -1488,12 +1703,12 @@ class FrostScene extends Phaser.Scene {
     }
     const rotation = clamp(dx / 88, -0.17, 0.17);
     this.contact.setPosition(point.x, point.y + 3).setRotation(angle);
-    this.finger.setPosition(point.x, point.y + 7).setRotation(Phaser.Math.Linear(this.finger.rotation, rotation, 0.32));
+    this.finger.setPosition(point.x, point.y + 2).setRotation(Phaser.Math.Linear(this.finger.rotation, rotation, 0.32));
     this.lastPoint = point;
     this.lastMoveAt = now;
   }
 
-  private judgeRhythmHit(event: Event) {
+  private judgeRhythmHit(event: Event, feedbackPoint?: Point) {
     if (!this.audio || !this.acceptingRhythmInput()) return;
     const context = this.audio.context;
     const stamp = context.getOutputTimestamp();
@@ -1522,15 +1737,18 @@ class FrostScene extends Phaser.Scene {
     const score = scoreRhythmHit(nearestDelta, rhythm);
     if (nearest < 0 || score === 0) {
       this.phraseExtras += 1;
-      this.showJudge("엇나감", "miss");
+      this.pulseHit("miss", feedbackPoint);
+      this.showJudge("\uC5C7\uBC15!", "miss");
       return;
     }
     this.matchedTimes[nearest] = true;
     this.phrasePoints += score;
     if (score === 100) {
-      this.showJudge("정확해요!", "perfect");
+      this.pulseHit("perfect", feedbackPoint);
+      this.showJudge("\uBF40\uB4DD!", "perfect");
     } else {
-      this.showJudge("좋아요", "good");
+      this.pulseHit("good", feedbackPoint);
+      this.showJudge("\uC4F1!", "good");
     }
   }
 
@@ -1583,6 +1801,7 @@ class FrostScene extends Phaser.Scene {
 
   private resetSurface() {
     this.stopRub();
+    this.resetVisualFeedback();
     this.frost.clear().draw(THEMES[this.theme].source, GLASS.width / 2, GLASS.height / 2).render();
     this.waterMap.clear().render();
     this.strokes = [];
@@ -1728,14 +1947,14 @@ class FrostScene extends Phaser.Scene {
     this.frost.render();
     this.tweens.killTweensOf(this.guideFinger);
     this.guideFinger
-      .setPosition(from.x, from.y + 8)
+      .setPosition(from.x, from.y + 2)
       .setRotation(forward ? 0.08 : -0.08)
       .setAlpha(0.46)
       .setVisible(true);
     this.tweens.add({
       targets: this.guideFinger,
       x: to.x,
-      y: to.y + 8,
+      y: to.y + 2,
       rotation: forward ? -0.06 : 0.06,
       duration: 115,
       ease: "Sine.Out",
@@ -1974,7 +2193,11 @@ class FrostScene extends Phaser.Scene {
 
   update(time: number, delta: number) {
     const now = performance.now();
+    this.beatEnergy *= Math.exp(-delta / 150);
+    if (this.beatEnergy < 0.001) this.beatEnergy = 0;
     this.glassShader.setUniform("uTime", time / 1000);
+    this.glassShader.setUniform("uBeat", this.beatEnergy);
+    this.drawAmbient(time / 1000);
     if (this.rubbing && now - this.lastMoveAt > 72) this.quietAudio();
     if (this.rubbing && !this.acceptingRhythmInput()) this.stopRub();
     if (this.audio && this.phaseEnd > this.phaseStart) {

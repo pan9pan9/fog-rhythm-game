@@ -3,14 +3,18 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#fff8ed" />
+    <meta name="theme-color" content="#FFF4DA" />
+    <link rel="icon" href="/brand-mark.svg" type="image/svg+xml" />
     <title>김 서린 유리 닦는 리듬게임</title>
   </head>
   <body>
     <main id="menu" class="stage-select" aria-labelledby="menu-title">
       <div class="stage-select__inner">
         <header class="stage-select__header">
-          <h1 id="menu-title">김 서린 유리 닦는 리듬게임</h1>
+          <h1 id="menu-title" aria-label="김 서린 유리 닦는 리듬게임">
+            <span class="wordmark__line">김 서린 유리 닦는</span>
+            <span class="wordmark__line wordmark__line--accent">리듬게임</span>
+          </h1>
         </header>
 
         <section class="stage-grid" aria-label="스테이지 선택">
@@ -19,12 +23,12 @@
               <span class="stage-card__number" aria-hidden="true">01</span>
               <span class="stage-card__status">플레이 가능</span>
             </div>
-            <div class="stage-card__preview" role="img" aria-label="겨울 도시가 비치는 성에 낀 유리창"></div>
+            <div class="stage-card__preview" role="img" aria-label="따뜻한 집 안에서 바라본 눈 내린 창밖"></div>
             <div class="stage-card__body">
               <p class="stage-card__label">1단계</p>
               <h2>겨울 성에</h2>
               <button class="stage-card__play" type="button" data-action="play-stage" data-stage="1" aria-label="1단계 겨울 성에 시작">
-                시작하기 <span aria-hidden="true">→</span>
+                시작하기
               </button>
             </div>
           </article>
@@ -34,12 +38,12 @@
               <span class="stage-card__number" aria-hidden="true">02</span>
               <span class="stage-card__status">잠김</span>
             </div>
-            <div class="stage-card__preview" role="img" aria-label="비 내리는 밤거리가 비치는 김 서린 유리창"></div>
+            <div class="stage-card__preview" role="img" aria-label="차 안에서 앞유리로 바라본 비 오는 밤거리"></div>
             <div class="stage-card__body">
               <p class="stage-card__label">2단계</p>
               <h2>김 서린 밤</h2>
               <button class="stage-card__play" type="button" data-action="play-stage" data-stage="2" aria-label="2단계 김 서린 밤, 잠김" disabled>
-                잠겨 있어요 <span aria-hidden="true">⌁</span>
+                잠겨 있어요
               </button>
             </div>
           </article>
@@ -49,12 +53,12 @@
               <span class="stage-card__number" aria-hidden="true">03</span>
               <span class="stage-card__status">잠김</span>
             </div>
-            <div class="stage-card__preview" role="img" aria-label="청록빛 조명 아래 습기가 가득 찬 샤워실 거울"></div>
+            <div class="stage-card__preview" role="img" aria-label="세면대 앞에서 바라본 욕실 거울"></div>
             <div class="stage-card__body">
               <p class="stage-card__label">3단계</p>
               <h2>샤워실 거울</h2>
               <button class="stage-card__play" type="button" data-action="play-stage" data-stage="3" aria-label="3단계 샤워실 거울, 잠김" disabled>
-                잠겨 있어요 <span aria-hidden="true">⌁</span>
+                잠겨 있어요
               </button>
             </div>
           </article>
@@ -62,9 +66,14 @@
       </div>
     </main>
 
-    <main id="game" aria-label="김 또는 성에가 낀 유리 문지르기" aria-hidden="true"></main>
+    <main id="game" tabindex="0" aria-label="김 또는 성에가 낀 유리 문지르기. 키보드는 스페이스 또는 엔터로 박자를 맞춥니다." aria-hidden="true"></main>
     <header class="play-topbar" aria-label="게임 조작">
-      <button id="back" type="button" aria-label="스테이지 선택으로 돌아가기">← 메뉴</button>
+      <button id="back" type="button" aria-label="스테이지 선택으로 돌아가기">
+        <svg aria-hidden="true" viewBox="0 0 24 24">
+          <path d="M15 5 8 12l7 7" />
+        </svg>
+        <span>메뉴</span>
+      </button>
       <p id="stage-chip">1단계 · 겨울 성에</p>
       <button id="reset" type="button" aria-label="유리창에 다시 김 서리게 하기">다시 김 서리기</button>
     </header>
