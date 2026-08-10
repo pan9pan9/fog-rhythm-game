@@ -1,0 +1,15 @@
+.vercel
+.env*
+node_modules/
+dist/
+tmp/
+.DS_Store
+*.log
+
+# Runtime uses the optimized WebP assets.
+public/assets/stage-*-cartoon.png
+public/assets/finger-cartoon.png
+public/assets/winter-city.webp
+public/assets/warm-rain-city.webp
+public/assets/shower-mirror.webp
+public/assets/finger.png

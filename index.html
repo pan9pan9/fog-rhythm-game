@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="ko" data-theme="frost" data-screen="menu">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#fff8ed" />
+    <title>김 서린 유리 닦는 리듬게임</title>
+  </head>
+  <body>
+    <main id="menu" class="stage-select" aria-labelledby="menu-title">
+      <div class="stage-select__inner">
+        <header class="stage-select__header">
+          <h1 id="menu-title">김 서린 유리 닦는 리듬게임</h1>
+        </header>
+
+        <section class="stage-grid" aria-label="스테이지 선택">
+          <article id="stage-1" class="stage-card stage-card--frost" data-stage="1" data-theme="frost" data-status="unlocked">
+            <div class="stage-card__top">
+              <span class="stage-card__number" aria-hidden="true">01</span>
+              <span class="stage-card__status">플레이 가능</span>
+            </div>
+            <div class="stage-card__preview" role="img" aria-label="겨울 도시가 비치는 성에 낀 유리창"></div>
+            <div class="stage-card__body">
+              <p class="stage-card__label">1단계</p>
+              <h2>겨울 성에</h2>
+              <button class="stage-card__play" type="button" data-action="play-stage" data-stage="1" aria-label="1단계 겨울 성에 시작">
+                시작하기 <span aria-hidden="true">→</span>
+              </button>
+            </div>
+          </article>
+
+          <article id="stage-2" class="stage-card stage-card--mist" data-stage="2" data-theme="mist" data-status="locked">
+            <div class="stage-card__top">
+              <span class="stage-card__number" aria-hidden="true">02</span>
+              <span class="stage-card__status">잠김</span>
+            </div>
+            <div class="stage-card__preview" role="img" aria-label="비 내리는 밤거리가 비치는 김 서린 유리창"></div>
+            <div class="stage-card__body">
+              <p class="stage-card__label">2단계</p>
+              <h2>김 서린 밤</h2>
+              <button class="stage-card__play" type="button" data-action="play-stage" data-stage="2" aria-label="2단계 김 서린 밤, 잠김" disabled>
+                잠겨 있어요 <span aria-hidden="true">⌁</span>
+              </button>
+            </div>
+          </article>
+
+          <article id="stage-3" class="stage-card stage-card--shower" data-stage="3" data-theme="shower" data-status="locked">
+            <div class="stage-card__top">
+              <span class="stage-card__number" aria-hidden="true">03</span>
+              <span class="stage-card__status">잠김</span>
+            </div>
+            <div class="stage-card__preview" role="img" aria-label="청록빛 조명 아래 습기가 가득 찬 샤워실 거울"></div>
+            <div class="stage-card__body">
+              <p class="stage-card__label">3단계</p>
+              <h2>샤워실 거울</h2>
+              <button class="stage-card__play" type="button" data-action="play-stage" data-stage="3" aria-label="3단계 샤워실 거울, 잠김" disabled>
+                잠겨 있어요 <span aria-hidden="true">⌁</span>
+              </button>
+            </div>
+          </article>
+        </section>
+      </div>
+    </main>
+
+    <main id="game" aria-label="김 또는 성에가 낀 유리 문지르기" aria-hidden="true"></main>
+    <header class="play-topbar" aria-label="게임 조작">
+      <button id="back" type="button" aria-label="스테이지 선택으로 돌아가기">← 메뉴</button>
+      <p id="stage-chip">1단계 · 겨울 성에</p>
+      <button id="reset" type="button" aria-label="유리창에 다시 김 서리게 하기">다시 김 서리기</button>
+    </header>
+
+    <section id="rhythm-hud" aria-label="리듬 진행 상태">
+      <div class="rhythm-hud__meta">
+        <span id="phase-chip">준비</span>
+        <span id="level-progress">레벨 1 / 5</span>
+      </div>
+      <p id="rhythm-prompt" aria-live="polite" aria-atomic="true">왼쪽 유리의 리듬을 들어보세요</p>
+      <div id="rhythm-timeline" aria-hidden="true"></div>
+    </section>
+    <p id="judge-pop" role="status" aria-live="polite"></p>
+    <p id="rotate-hint" role="status">가로 화면으로 돌려서 플레이해 주세요</p>
+
+    <section id="clear-panel" role="dialog" aria-modal="true" aria-labelledby="clear-title" aria-describedby="clear-copy" hidden>
+      <div class="clear-panel__card">
+        <p class="clear-panel__label">리듬 결과</p>
+        <h2 id="clear-title">스테이지 클리어</h2>
+        <p id="clear-copy">다음 스테이지가 열렸어요.</p>
+        <div class="clear-panel__actions">
+          <button id="clear-next" type="button" data-action="clear-next">다음 스테이지</button>
+          <button id="clear-menu" type="button" data-action="clear-menu">스테이지 선택</button>
+        </div>
+      </div>
+    </section>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
