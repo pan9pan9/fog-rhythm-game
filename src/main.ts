@@ -271,44 +271,34 @@ type Point = { x: number; y: number };
 const SURFACE_SHAPES: Record<ThemeKey, { points: Point[]; divider: [number, number] }> = {
   frost: {
     points: [
-      { x: 207, y: 60 },
-      { x: 1120, y: 60 },
-      { x: 1125, y: 92 },
-      { x: 1134, y: 140 },
-      { x: 1146, y: 202 },
-      { x: 1159, y: 278 },
-      { x: 1167, y: 362 },
-      { x: 1168, y: 460 },
-      { x: 1160, y: 545 },
-      { x: 1149, y: 624 },
-      { x: 1155, y: 665 },
-      { x: 1008, y: 665 },
-      { x: 1002, y: 650 },
-      { x: 990, y: 640 },
-      { x: 965, y: 633 },
-      { x: 875, y: 630 },
-      { x: 852, y: 635 },
-      { x: 843, y: 650 },
-      { x: 841, y: 665 },
-      { x: 520, y: 665 },
-      { x: 510, y: 653 },
-      { x: 488, y: 642 },
-      { x: 450, y: 636 },
-      { x: 350, y: 632 },
-      { x: 260, y: 638 },
-      { x: 225, y: 649 },
-      { x: 213, y: 665 },
-      { x: 170, y: 665 },
-      { x: 168, y: 557 },
-      { x: 165, y: 482 },
-      { x: 150, y: 390 },
-      { x: 174, y: 303 },
-      { x: 185, y: 229 },
-      { x: 196, y: 168 },
-      { x: 204, y: 119 },
-      { x: 204, y: 108 },
+      { x: 210, y: 66 },
+      { x: 1123, y: 66 },
+      { x: 1126, y: 90 },
+      { x: 1128, y: 120 },
+      { x: 1134, y: 160 },
+      { x: 1145, y: 220 },
+      { x: 1165, y: 300 },
+      { x: 1199, y: 360 },
+      { x: 1215, y: 420 },
+      { x: 1199, y: 500 },
+      { x: 1180, y: 560 },
+      { x: 1177, y: 580 },
+      { x: 1172, y: 620 },
+      { x: 1169, y: 665 },
+      { x: 175, y: 665 },
+      { x: 172, y: 620 },
+      { x: 167, y: 580 },
+      { x: 165, y: 560 },
+      { x: 156, y: 500 },
+      { x: 139, y: 420 },
+      { x: 148, y: 360 },
+      { x: 170, y: 300 },
+      { x: 190, y: 220 },
+      { x: 200, y: 160 },
+      { x: 205, y: 120 },
+      { x: 208, y: 90 },
     ],
-    divider: [60, 665],
+    divider: [66, 665],
   },
   mist: {
     points: [
@@ -344,20 +334,20 @@ const SURFACE_SHAPES: Record<ThemeKey, { points: Point[]; divider: [number, numb
   },
   shower: {
     points: [
-      { x: 206, y: 130 },
-      { x: 1082, y: 130 },
-      { x: 1087, y: 132 },
-      { x: 1089, y: 137 },
-      { x: 1089, y: 608 },
-      { x: 1087, y: 613 },
-      { x: 1082, y: 616 },
-      { x: 206, y: 616 },
-      { x: 202, y: 613 },
-      { x: 200, y: 608 },
-      { x: 200, y: 137 },
-      { x: 202, y: 132 },
+      { x: 146, y: 57 },
+      { x: 1130, y: 57 },
+      { x: 1137, y: 59 },
+      { x: 1140, y: 66 },
+      { x: 1140, y: 574 },
+      { x: 1137, y: 581 },
+      { x: 1130, y: 583 },
+      { x: 146, y: 583 },
+      { x: 139, y: 581 },
+      { x: 136, y: 574 },
+      { x: 136, y: 66 },
+      { x: 139, y: 59 },
     ],
-    divider: [130, 616],
+    divider: [57, 583],
   },
 };
 type WetStroke = Point & { x2: number; y2: number; born: number; angle: number; energy: number };
@@ -507,16 +497,6 @@ function drawGameGlassCrop(context: CanvasRenderingContext2D, source: HTMLImageE
     GLASS.width,
     GLASS.height,
   );
-}
-
-function drawStageForeground(context: CanvasRenderingContext2D, source: HTMLImageElement, points: Point[]) {
-  context.drawImage(source, 0, 0, GAME.width, GAME.height);
-  context.globalCompositeOperation = "destination-out";
-  context.beginPath();
-  context.moveTo(points[0].x, points[0].y);
-  points.slice(1).forEach((point) => context.lineTo(point.x, point.y));
-  context.closePath();
-  context.fill();
 }
 
 function paintBrush(context: CanvasRenderingContext2D) {
@@ -867,8 +847,10 @@ class FrostScene extends Phaser.Scene {
   private judgePop?: HTMLElement;
   private squeakTravel = 0;
   private lastSqueakAt = 0;
+  private lastFoleyAt = 0;
   private audioAmount = 0;
   private beatEnergy = 0;
+  private audioReady?: Promise<void>;
   private audio?: {
     context: AudioContext;
     source: AudioBufferSourceNode;
@@ -879,6 +861,8 @@ class FrostScene extends Phaser.Scene {
     squeakGain: GainNode;
     toneGain: GainNode;
     master: GainNode;
+    foley: Record<ThemeKey, AudioBuffer[]>;
+    rubberHit?: AudioBuffer;
   };
 
   constructor() {
@@ -886,11 +870,20 @@ class FrostScene extends Phaser.Scene {
   }
 
   preload() {
-    this.load.image("frost-handdrawn", "/assets/stage-frost-pov.webp");
-    this.load.image("mist-handdrawn", "/assets/stage-mist-pov.webp");
-    this.load.image("shower-handdrawn", "/assets/stage-shower-pov.webp");
+    this.load.image("frost-handdrawn", "/assets/stage-frost-background.webp");
+    this.load.image("mist-handdrawn", "/assets/stage-mist-background.webp");
+    this.load.image("shower-handdrawn", "/assets/stage-shower-background.webp");
+    this.load.image("frost-foreground", "/assets/stage-frost-foreground.webp");
+    this.load.image("mist-foreground", "/assets/stage-mist-foreground.webp");
+    this.load.image("shower-foreground", "/assets/stage-shower-foreground.webp");
     this.load.image("frost-photo", "/assets/wet-frost.webp");
     this.load.image("finger-photo", "/assets/finger-handdrawn.webp");
+    this.load.binary("foley-frost-scrape", "/audio/foley/frost-scrape.mp3");
+    this.load.binary("foley-frost-squeak", "/audio/foley/frost-squeak.mp3");
+    this.load.binary("foley-mist", "/audio/foley/mist-wet-glass.mp3");
+    this.load.binary("foley-rubber-hit", "/audio/foley/rubber-hit.mp3");
+    this.load.binary("foley-shower-wet", "/audio/foley/shower-wet-glass.mp3");
+    this.load.binary("foley-shower-wipe", "/audio/foley/shower-wipe.mp3");
   }
 
   create() {
@@ -908,23 +901,18 @@ class FrostScene extends Phaser.Scene {
     const winter = this.textures.get("frost-handdrawn").getSourceImage() as HTMLImageElement;
     const warmRain = this.textures.get("mist-handdrawn").getSourceImage() as HTMLImageElement;
     const shower = this.textures.get("shower-handdrawn").getSourceImage() as HTMLImageElement;
+    const frostForeground = this.textures.get("frost-foreground").getSourceImage() as HTMLImageElement;
+    const mistForeground = this.textures.get("mist-foreground").getSourceImage() as HTMLImageElement;
+    const showerForeground = this.textures.get("shower-foreground").getSourceImage() as HTMLImageElement;
     const frostPhoto = this.textures.get("frost-photo").getSourceImage() as HTMLImageElement;
     if (import.meta.env.DEV) {
       console.assert(
-        [winter, warmRain, shower].every((image) => image.naturalWidth === GAME.width && image.naturalHeight === GAME.height),
+        [winter, warmRain, shower, frostForeground, mistForeground, showerForeground].every(
+          (image) => image.naturalWidth === GAME.width && image.naturalHeight === GAME.height,
+        ),
         "POV 원화는 게임 좌표와 같은 1280×720이어야 유리 크롭이 맞습니다.",
       );
     }
-
-    addCanvasTexture(this, "frost-foreground", GAME.width, GAME.height, (context) =>
-      drawStageForeground(context, winter, SURFACE_SHAPES.frost.points),
-    );
-    addCanvasTexture(this, "mist-foreground", GAME.width, GAME.height, (context) =>
-      drawStageForeground(context, warmRain, SURFACE_SHAPES.mist.points),
-    );
-    addCanvasTexture(this, "shower-foreground", GAME.width, GAME.height, (context) =>
-      drawStageForeground(context, shower, SURFACE_SHAPES.shower.points),
-    );
 
     addCanvasTexture(this, "winter-view", GLASS.width, GLASS.height, (context) => {
       context.filter = "saturate(.92) contrast(1.02) brightness(.94)";
@@ -975,7 +963,7 @@ class FrostScene extends Phaser.Scene {
       .image(GAME.width / 2, GAME.height / 2, theme.backdrop)
       .setDisplaySize(GAME.width, GAME.height)
       .setDepth(-2);
-    this.ambientLayer = this.add.graphics().setDepth(-1);
+    this.ambientLayer = this.add.graphics();
     this.surfaceMaskShape = this.make.graphics({}, false);
     this.surfaceLayer = this.add.layer().setDepth(1);
 
@@ -1014,6 +1002,7 @@ class FrostScene extends Phaser.Scene {
       this.glassShader,
       this.blurred,
       this.glassOverlay,
+      this.ambientLayer,
       this.wetLayer,
       this.phaseOverlay,
       this.dropLayer,
@@ -1160,34 +1149,97 @@ class FrostScene extends Phaser.Scene {
     const layer = this.ambientLayer;
     const motion = time * (REDUCED_MOTION.matches ? 0.12 : 1);
     const pulse = this.beatEnergy;
+    const frame = Math.floor(motion * 9);
+    const boil = (frame % 3) - 1;
     layer.clear();
     if (!this.playing) return;
 
     if (this.theme === "frost") {
-      layer.fillStyle(0xfff4d7, 0.13 + pulse * 0.08);
-      for (let index = 0; index < 11; index += 1) {
-        const x = 28 + ((index * 173 + motion * (5 + (index % 3) * 2)) % (GAME.width - 56));
-        const y = -14 + ((index * 97 + motion * (11 + (index % 2) * 3)) % (GAME.height + 28));
-        layer.fillCircle(x, y, 1.5 + (index % 3) * 0.7);
+      layer.lineStyle(1.4, 0xfff4d7, 0.15 + pulse * 0.12);
+      for (let index = 0; index < 10; index += 1) {
+        const x = 34 + ((index * 173 + frame * (1 + (index % 3))) % (GAME.width - 68));
+        const y = -16 + ((index * 97 + frame * (2 + (index % 2))) % (GAME.height + 32));
+        const radius = 2.4 + (index % 3);
+        layer.lineBetween(x - radius, y + boil * 0.4, x + radius, y - boil * 0.4);
+        layer.lineBetween(x + boil * 0.4, y - radius, x - boil * 0.4, y + radius);
+        if (index % 2 === 0) layer.lineBetween(x - radius * 0.7, y - radius * 0.7, x + radius * 0.7, y + radius * 0.7);
+      }
+
+      layer.lineStyle(3, 0xfff5df, 0.09 + pulse * 0.11);
+      for (let stroke = 0; stroke < 3; stroke += 1) {
+        layer.beginPath();
+        for (let step = 0; step < 7; step += 1) {
+          const y = 218 - step * 18 - ((frame * 2 + stroke * 13) % 28);
+          const x = 1068 + Math.sin(step * 0.9 + frame * 0.14 + stroke) * (6 + step * 1.4) + boil;
+          if (step === 0) layer.moveTo(x, y);
+          else layer.lineTo(x, y);
+        }
+        layer.strokePath();
+      }
+      if (pulse > 0.18) {
+        layer.lineStyle(2, 0xffeaa7, 0.25 + pulse * 0.4);
+        const radius = 4 + pulse * 4;
+        layer.lineBetween(258 - radius, 580, 258 + radius, 580);
+        layer.lineBetween(258, 580 - radius, 258, 580 + radius);
+        layer.lineBetween(1098 - radius, 568, 1098 + radius, 568);
+        layer.lineBetween(1098, 568 - radius, 1098, 568 + radius);
+        layer.lineStyle(2, 0xfff2c8, 0.22 + pulse * 0.34);
+        layer.beginPath().arc(790, 216, 9 + boil, Math.PI * 1.1, Math.PI * 1.85).strokePath();
+        layer.beginPath().arc(820, 215, 9 - boil, Math.PI * 1.15, Math.PI * 1.9).strokePath();
       }
       return;
     }
 
     if (this.theme === "mist") {
-      layer.lineStyle(2, 0xffd5bb, 0.12 + pulse * 0.07);
-      for (let index = 0; index < 9; index += 1) {
-        const x = -70 + ((index * 181 + motion * 29) % (GAME.width + 140));
-        const y = -50 + ((index * 109 + motion * 47) % (GAME.height + 100));
-        layer.lineBetween(x, y, x + 14, y + 31);
+      layer.lineStyle(1.6, 0xb9d8dd, 0.1 + pulse * 0.08);
+      for (let index = 0; index < 11; index += 1) {
+        const x = -70 + ((index * 181 + frame * 7) % (GAME.width + 140));
+        const y = -50 + ((index * 109 + frame * 11) % (GAME.height + 100));
+        const length = 21 + (index % 3) * 8;
+        layer.lineBetween(x + boil, y, x + 8 + boil, y + length);
+      }
+
+      layer.lineStyle(2.5, 0xffd477, 0.12 + pulse * 0.18);
+      layer.strokeCircle(848 + boil, 177, 24 + pulse * 8);
+      layer.lineStyle(2.5, 0xff705b, 0.14 + pulse * 0.28);
+      layer.strokeCircle(628, 260, 8 + pulse * 5);
+      for (let light = 0; light < 2; light += 1) {
+        const baseX = light === 0 ? 686 : 748;
+        layer.beginPath().moveTo(baseX + boil, 424);
+        for (let step = 1; step < 7; step += 1) {
+          const y = 424 + step * 21;
+          const x = baseX + Math.sin(step * 1.7 + frame * 0.28 + light) * (2 + step * 0.8);
+          layer.lineTo(x, y);
+        }
+        layer.strokePath();
       }
       return;
     }
 
-    layer.fillStyle(0xdffff5, 0.055 + pulse * 0.045);
-    for (let index = 0; index < 7; index += 1) {
-      const x = 70 + ((index * 193 + Math.sin(motion * 0.22 + index) * 18) % (GAME.width - 140));
-      const y = GAME.height + 40 - ((index * 113 + motion * (13 + (index % 2) * 3)) % (GAME.height + 90));
-      layer.fillEllipse(x, y, 38 + (index % 3) * 14, 17 + (index % 2) * 7);
+    layer.lineStyle(3, 0xe9fff4, 0.08 + pulse * 0.09);
+    for (let curl = 0; curl < 5; curl += 1) {
+      layer.beginPath();
+      for (let step = 0; step < 8; step += 1) {
+        const y = 612 - ((curl * 91 + frame * 3 + step * 15) % 440);
+        const x = 260 + curl * 168 + Math.sin(step * 0.95 + frame * 0.12 + curl) * (9 + step * 1.2);
+        if (step === 0) layer.moveTo(x, y);
+        else layer.lineTo(x, y);
+      }
+      layer.strokePath();
+    }
+    layer.fillStyle(0xcffff3, 0.13 + pulse * 0.11);
+    for (let drop = 0; drop < 6; drop += 1) {
+      const x = 238 + drop * 11 + boil;
+      const y = 244 + ((frame * 8 + drop * 23) % 126);
+      layer.fillEllipse(x, y, 2.2, 5 + (drop % 2) * 2);
+    }
+    if (pulse > 0.2) {
+      layer.lineStyle(2, 0xffcf75, 0.28 + pulse * 0.38);
+      layer.beginPath().arc(940, 252, 26 + pulse * 5, -0.65, 0.2).strokePath();
+      layer.beginPath().arc(940, 252, 26 + pulse * 5, Math.PI - 0.2, Math.PI + 0.65).strokePath();
+      layer.lineStyle(2, 0xe8fff7, 0.2 + pulse * 0.3);
+      layer.lineBetween(776 + boil, 214, 770 - boil, 205);
+      layer.lineBetween(795 - boil, 220, 803 + boil, 210);
     }
   }
 
@@ -1209,6 +1261,7 @@ class FrostScene extends Phaser.Scene {
   }
 
   private pulseHit(kind: "perfect" | "good" | "miss", feedbackPoint?: Point) {
+    this.playJudgeFoley(kind);
     const color = kind === "perfect" ? 0xffe78a : kind === "good" ? 0xbef8e8 : 0xff9b87;
     const radius = kind === "perfect" ? 30 : kind === "good" ? 25 : 21;
     const point = feedbackPoint ?? this.input.activePointer;
@@ -1467,7 +1520,11 @@ class FrostScene extends Phaser.Scene {
 
     for (let beat = -2; beat <= phrase.beats * 2; beat += 1) {
       const at = cueStart + beat * beatSeconds;
-      this.schedulePulse(at, beat === 0 || beat === phrase.beats);
+      const accent = beat === 0 || beat === phrase.beats;
+      this.schedulePulse(at, accent);
+      this.scheduleAt(at, token, () => {
+        this.beatEnergy = Math.max(this.beatEnergy, accent ? 0.56 : 0.32);
+      });
     }
     phrase.hits.forEach((tick, index) => {
       const at = cueStart + (tick / RHYTHM_TICKS) * beatSeconds;
@@ -1670,6 +1727,7 @@ class FrostScene extends Phaser.Scene {
     this.nextDropDistance = nextDropGap(this.theme);
     this.squeakTravel = 0;
     this.lastSqueakAt = 0;
+    this.lastFoleyAt = 0;
     this.audioAmount = 0;
     this.strokeDirection = undefined;
     this.strokeAnchor = point;
@@ -1871,13 +1929,50 @@ class FrostScene extends Phaser.Scene {
     this.contact.setVisible(false);
   }
 
-  private async ensureAudio() {
-    if (this.audio) {
-      await this.audio.context.resume();
+  private ensureAudio() {
+    if (this.audio) return this.audio.context.resume();
+    return (this.audioReady ??= this.createAudio().finally(() => {
+      this.audioReady = undefined;
+    }));
+  }
+
+  private async createAudio() {
+    const context = new AudioContext();
+    const foley: Record<ThemeKey, AudioBuffer[]> = { frost: [], mist: [], shower: [] };
+    let rubberHit: AudioBuffer | undefined;
+    try {
+      const decode = (key: string) => {
+        const bytes = this.cache.binary.get(key) as ArrayBuffer | undefined;
+        if (!bytes) throw new Error(`폴리 오디오를 찾을 수 없습니다: ${key}`);
+        return context.decodeAudioData(bytes.slice(0));
+      };
+      const [frostScrape, frostSqueak, mist, hit, showerWet, showerWipe] = await Promise.all([
+        decode("foley-frost-scrape"),
+        decode("foley-frost-squeak"),
+        decode("foley-mist"),
+        decode("foley-rubber-hit"),
+        decode("foley-shower-wet"),
+        decode("foley-shower-wipe"),
+      ]);
+      foley.frost.push(frostScrape, frostSqueak);
+      foley.mist.push(mist);
+      foley.shower.push(showerWet, showerWipe);
+      rubberHit = hit;
+      if (import.meta.env.DEV) {
+        console.assert(
+          Object.values(foley).every((buffers) => buffers.length > 0 && buffers.every((buffer) => buffer.duration > 0.2)) &&
+            rubberHit.duration > 0.2,
+          "실제 폴리 오디오 디코딩이 누락됐습니다.",
+        );
+      }
+    } catch (error) {
+      console.warn("실제 폴리 오디오를 불러오지 못해 합성음으로 재생합니다.", error);
+    }
+    if (!this.sys.isActive()) {
+      await context.close();
       return;
     }
 
-    const context = new AudioContext();
     const buffer = context.createBuffer(1, context.sampleRate * 2, context.sampleRate);
     const data = buffer.getChannelData(0);
     let softNoise = 0;
@@ -1928,7 +2023,7 @@ class FrostScene extends Phaser.Scene {
     master.connect(limiter).connect(context.destination);
     source.start();
     squeakTone.start();
-    this.audio = { context, source, squeakTone, bodyFilter, squeakFilter, bodyGain, squeakGain, toneGain, master };
+    this.audio = { context, source, squeakTone, bodyFilter, squeakFilter, bodyGain, squeakGain, toneGain, master, foley, rubberHit };
     await context.resume();
   }
 
@@ -1984,6 +2079,51 @@ class FrostScene extends Phaser.Scene {
 
     source.connect(filter).connect(gain).connect(pan).connect(this.audio.master);
     source.start(at, Math.random() * Math.max(0.01, source.buffer.duration - 0.1), 0.085);
+    this.trackSource(source);
+    this.playFoley(at, -0.42, 0.72, true);
+  }
+
+  private playFoley(at: number, panValue: number, amount: number, cue = false) {
+    if (!this.audio) return;
+    const buffers = this.audio.foley[this.theme];
+    if (!buffers.length) return;
+    const context = this.audio.context;
+    const buffer = buffers[Math.floor(Math.random() * buffers.length)];
+    const source = context.createBufferSource();
+    const filter = context.createBiquadFilter();
+    const gain = context.createGain();
+    const pan = context.createStereoPanner();
+    const duration = Math.min(buffer.duration, cue ? 0.095 : this.theme === "frost" ? 0.06 : 0.085);
+    const outputDuration = duration / (0.9 + amount * 0.2);
+    const offset = Math.random() * Math.max(0, buffer.duration - duration - 0.01);
+    const peak = (cue ? 0.03 : 0.019) * (0.72 + amount * 0.42);
+    source.buffer = buffer;
+    source.playbackRate.setValueAtTime(0.9 + amount * 0.2, at);
+    filter.type = "highpass";
+    filter.frequency.setValueAtTime(this.theme === "frost" ? 520 : this.theme === "mist" ? 180 : 120, at);
+    filter.Q.setValueAtTime(0.55, at);
+    pan.pan.setValueAtTime(panValue, at);
+    gain.gain.setValueAtTime(0.0001, at);
+    gain.gain.linearRampToValueAtTime(peak, at + 0.003);
+    gain.gain.exponentialRampToValueAtTime(0.0001, at + outputDuration);
+    source.connect(filter).connect(gain).connect(pan).connect(this.audio.master);
+    source.start(at, offset, duration);
+    source.stop(at + outputDuration + 0.015);
+    this.trackSource(source);
+  }
+
+  private playJudgeFoley(kind: "perfect" | "good" | "miss") {
+    if (!this.audio?.rubberHit || kind === "miss") return;
+    const at = this.audio.context.currentTime;
+    const source = this.audio.context.createBufferSource();
+    const gain = this.audio.context.createGain();
+    const pan = this.audio.context.createStereoPanner();
+    source.buffer = this.audio.rubberHit;
+    source.playbackRate.setValueAtTime(this.theme === "frost" ? 1.18 : this.theme === "shower" ? 0.92 : 1, at);
+    gain.gain.setValueAtTime(kind === "perfect" ? 0.014 : 0.009, at);
+    pan.pan.setValueAtTime(0.36, at);
+    source.connect(gain).connect(pan).connect(this.audio.master);
+    source.start(at, 0, Math.min(0.18, source.buffer.duration));
     this.trackSource(source);
   }
 
@@ -2068,6 +2208,10 @@ class FrostScene extends Phaser.Scene {
     this.audio.squeakFilter.frequency.cancelAndHoldAtTime(now);
     this.audio.squeakFilter.frequency.setValueAtTime(1800 + amount * 1700 + Math.random() * 900, now);
     this.audio.squeakFilter.Q.setTargetAtTime(1.4 + pressure * 2.2, now, 0.004);
+    if (now - this.lastFoleyAt >= 0.045) {
+      this.lastFoleyAt = now;
+      this.playFoley(now, 0.34, (amount + pressure) * 0.5);
+    }
   }
 
   private triggerWetSqueak(amount: number, pressure: number, now: number) {
@@ -2095,6 +2239,10 @@ class FrostScene extends Phaser.Scene {
       shower ? 1120 + amount * 620 + pressure * 240 : 900 + amount * 600 + pressure * 220,
       now + duration,
     );
+    if (now - this.lastFoleyAt >= 0.052) {
+      this.lastFoleyAt = now;
+      this.playFoley(now, 0.34, (amount + pressure) * 0.5);
+    }
   }
 
   private quietAudio() {
